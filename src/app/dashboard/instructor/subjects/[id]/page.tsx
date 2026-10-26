@@ -277,7 +277,7 @@ export default async function SubjectFolderPage({
     id: string;
     offering_id: string;
     subject_id: string | null;
-    author_id: string;
+    author_id: string | null;
     title: string;
     body: string;
     attachment_type: string;
@@ -395,6 +395,8 @@ export default async function SubjectFolderPage({
         gradebook={gradebookData}
         announcements={announcements}
         announcementSignedUrls={announcementSignedUrls}
+        viewerId={viewer.userId}
+        viewerRole={viewer.role}
       />
     </div>
   );

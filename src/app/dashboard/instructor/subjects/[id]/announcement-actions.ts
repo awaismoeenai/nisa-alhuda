@@ -14,7 +14,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireRole } from "@/lib/db/auth";
+import { requireRole, assertAssistsIfTA } from "@/lib/db/auth";
 
 type Result<T = void> = { success: boolean; error?: string; data?: T };
 
@@ -24,7 +24,7 @@ export interface CourseAnnouncementRow {
   id: string;
   offering_id: string;
   subject_id: string | null;
-  author_id: string;
+  author_id: string | null;
   title: string;
   body: string;
   attachment_type: AnnouncementAttachmentType;
@@ -35,7 +35,16 @@ export interface CourseAnnouncementRow {
   updated_at: string;
 }
 
-const STAFF = ["admin", "instructor"] as const;
+/**
+ * Who may post. A TA is included but course-scoped: assertAssistsIfTA() below
+ * confirms they actually assist the offering before any write lands
+ * (migration 039's scoped-instructor model).
+ */
+const STAFF = ["admin", "instructor", "ta"] as const;
+
+/** Deleting is destructive, so it stays with admins and instructors — a TA
+ *  may create and edit, never destroy (migration 039). */
+const DELETERS = ["admin", "instructor"] as const;
 
 function revalidate(subjectId: string) {
   revalidatePath(`/dashboard/instructor/subjects/${subjectId}`);
@@ -52,6 +61,8 @@ export async function createTextAnnouncement(
 ): Promise<Result<{ id: string }>> {
   const auth = await requireRole([...STAFF]);
   if (!auth.ok) return { success: false, error: auth.error };
+  const denied = await assertAssistsIfTA(auth, offeringId);
+  if (denied) return { success: false, error: denied.error };
   if (!title.trim()) return { success: false, error: "Title is required." };
 
   const admin = createAdminClient();
@@ -88,6 +99,8 @@ export async function createFileAnnouncement(
 ): Promise<Result<{ id: string }>> {
   const auth = await requireRole([...STAFF]);
   if (!auth.ok) return { success: false, error: auth.error };
+  const denied = await assertAssistsIfTA(auth, offeringId);
+  if (denied) return { success: false, error: denied.error };
   if (!title.trim()) return { success: false, error: "Title is required." };
 
   const file = formData.get("file") as File | null;
@@ -136,22 +149,40 @@ export async function createFileAnnouncement(
 
 /**
  * Delete an announcement (and its storage object if present).
+ *
+ * These writes go through the service-role client, which bypasses RLS — so
+ * the ownership rule the `course_announcements_delete` policy states has to
+ * be re-stated here or it never actually runs. An instructor may remove only
+ * their own post; an admin may remove any. TAs are excluded entirely.
  */
 export async function deleteAnnouncement(
   announcementId: string,
   subjectId: string
 ): Promise<Result> {
-  const auth = await requireRole([...STAFF]);
+  const auth = await requireRole([...DELETERS]);
   if (!auth.ok) return { success: false, error: auth.error };
 
   const admin = createAdminClient();
 
-  // Read first so we can clean up storage.
+  // Read first so we can authorize the caller and clean up storage.
   const { data: row } = await admin
     .from("course_announcements")
-    .select("attachment_url, attachment_type")
+    .select("attachment_url, attachment_type, author_id")
     .eq("id", announcementId)
-    .single<{ attachment_url: string | null; attachment_type: string }>();
+    .maybeSingle<{
+      attachment_url: string | null;
+      attachment_type: string;
+      author_id: string | null;
+    }>();
+
+  if (!row) return { success: false, error: "Announcement not found." };
+
+  if (auth.role !== "admin" && row.author_id !== auth.userId) {
+    return {
+      success: false,
+      error: "You can only delete announcements you posted.",
+    };
+  }
 
   const { error } = await admin
     .from("course_announcements")

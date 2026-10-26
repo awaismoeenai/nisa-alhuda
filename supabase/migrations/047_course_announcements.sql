@@ -20,7 +20,10 @@ CREATE TABLE IF NOT EXISTS public.course_announcements (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   offering_id      UUID        NOT NULL REFERENCES public.offerings(id)  ON DELETE CASCADE,
   subject_id       UUID        REFERENCES public.subjects(id) ON DELETE SET NULL,
-  author_id        UUID        NOT NULL REFERENCES public.profiles(id)   ON DELETE SET NULL,
+  -- Nullable on purpose: ON DELETE SET NULL cannot fire against a NOT NULL
+  -- column, so deleting a staff profile would fail outright. Matches the
+  -- created_by / graded_by convention in migrations 035 and 042.
+  author_id        UUID        REFERENCES public.profiles(id)   ON DELETE SET NULL,
   title            TEXT        NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
   body             TEXT        NOT NULL DEFAULT '',
   attachment_type  TEXT        NOT NULL DEFAULT 'text'
@@ -46,7 +49,9 @@ CREATE POLICY course_announcements_select ON public.course_announcements FOR SEL
   USING (
     public.has_role('admin'::user_role)
     OR public.has_role('instructor'::user_role)
-    OR public.has_role('ta'::user_role)
+    -- A TA is scoped at the database layer (migration 039): they cannot read
+    -- a course they don't assist, so has_role('ta') alone would be too wide.
+    OR public.assists_offering(offering_id)
     OR public.is_enrolled(offering_id)
   );
 
@@ -72,6 +77,19 @@ CREATE POLICY course_announcements_delete ON public.course_announcements FOR DEL
     OR (public.has_role('instructor'::user_role) AND author_id = auth.uid())
   );
 
+-- ── Teaching Assistant: scoped write access (migration 039 model) ───────────
+-- Posting exam dates and class updates is running the class, which is exactly
+-- what a TA is for. Additive policies gated on assists_offering(), so the
+-- admin/instructor paths above are untouched. No DELETE policy: per migration
+-- 039 a TA may create and edit, never destroy.
+
+CREATE POLICY course_announcements_ta_insert ON public.course_announcements FOR INSERT
+  WITH CHECK (public.assists_offering(offering_id));
+
+CREATE POLICY course_announcements_ta_update ON public.course_announcements FOR UPDATE
+  USING (public.assists_offering(offering_id) AND author_id = auth.uid())
+  WITH CHECK (public.assists_offering(offering_id) AND author_id = auth.uid());
+
 -- ── Storage: announcement attachments in `resources` bucket ──────────────────
 -- Path contract: course-announcements/<offering_id>/<filename>
 
@@ -84,6 +102,7 @@ CREATE POLICY "Staff can upload course announcement attachments"
     AND (
       public.has_role('admin'::user_role)
       OR public.has_role('instructor'::user_role)
+      OR public.has_role('ta'::user_role)
     )
   );
 

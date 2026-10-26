@@ -75,6 +75,9 @@ interface Props {
   announcements: CourseAnnouncementRow[];
   /** signed URL keyed by the storage path (attachment_url) */
   signedUrls: Record<string, string>;
+  /** Who is looking — used to decide whose Delete buttons are shown. */
+  viewerId: string;
+  viewerRole: string;
 }
 
 export function AnnouncementsPanel({
@@ -82,7 +85,14 @@ export function AnnouncementsPanel({
   offeringId,
   announcements,
   signedUrls,
+  viewerId,
+  viewerRole,
 }: Props) {
+  // Mirrors deleteAnnouncement(): admins remove anything, instructors remove
+  // only their own, TAs remove nothing. Showing a button that the server will
+  // refuse is worse than not showing it at all.
+  const canDeleteAny = viewerRole === "admin";
+  const canDeleteOwn = viewerRole === "instructor";
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -151,6 +161,7 @@ export function AnnouncementsPanel({
               item={a}
               signedUrl={a.attachment_url ? (signedUrls[a.attachment_url] ?? null) : null}
               onDelete={() => handleDelete(a.id)}
+              canDelete={canDeleteAny || (canDeleteOwn && a.author_id === viewerId)}
               disabled={pending}
             />
           ))}
@@ -297,11 +308,13 @@ function AnnouncementCard({
   item,
   signedUrl,
   onDelete,
+  canDelete,
   disabled,
 }: {
   item: CourseAnnouncementRow;
   signedUrl: string | null;
   onDelete: () => void;
+  canDelete: boolean;
   disabled: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -349,15 +362,17 @@ function AnnouncementCard({
           >
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={onDelete}
-            className="rounded-[6px] p-1 text-stone-300 transition-colors hover:text-rose-500 dark:text-stone-600"
-            aria-label="Delete announcement"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {canDelete && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onDelete}
+              className="rounded-[6px] p-1 text-stone-300 transition-colors hover:text-rose-500 dark:text-stone-600"
+              aria-label="Delete announcement"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

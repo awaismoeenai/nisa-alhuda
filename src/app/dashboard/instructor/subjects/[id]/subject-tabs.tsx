@@ -56,6 +56,8 @@ export function SubjectTabs({
   gradebook,
   announcements = [],
   announcementSignedUrls = {},
+  viewerId,
+  viewerRole,
 }: {
   subjectId: string;
   offeringId: string;
@@ -67,6 +69,8 @@ export function SubjectTabs({
   gradebook: GradebookData;
   announcements?: CourseAnnouncementRow[];
   announcementSignedUrls?: Record<string, string>;
+  viewerId: string;
+  viewerRole: string;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -160,6 +164,8 @@ export function SubjectTabs({
           offeringId={offeringId}
           announcements={announcements}
           signedUrls={announcementSignedUrls}
+          viewerId={viewerId}
+          viewerRole={viewerRole}
         />
       )}
     </div>
