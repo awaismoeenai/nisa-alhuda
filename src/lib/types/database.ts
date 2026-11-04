@@ -65,6 +65,21 @@ export interface Profile {
 }
 
 /**
+ * The part of a profile an unsigned visitor may read — the public
+ * catalogue columns and nothing else. Mirrors `PROFILE_SELECT_PUBLIC`
+ * and the `anon` column GRANT in migration 050, which deliberately
+ * leaves out `phone`, `is_suspended` and `must_change_password`.
+ *
+ * Any query a logged-out caller can reach must select this shape. Asking
+ * for a column `anon` was not granted makes PostgREST refuse the whole
+ * request with 401, not just drop the column.
+ */
+export type PublicProfile = Pick<
+  Profile,
+  "id" | "full_name" | "avatar_url" | "role" | "roles" | "created_at" | "updated_at"
+>;
+
+/**
  * Returns true if the given profile holds `target` role in either the
  * primary `role` slot or the additional `roles[]` array. Mirrors the
  * server-side `has_role()` SQL function for client-side capability checks.

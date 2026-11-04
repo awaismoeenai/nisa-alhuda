@@ -36,7 +36,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { PROFILE_SELECT } from "@/lib/db/profiles";
+import { PROFILE_SELECT_PUBLIC } from "@/lib/db/profiles";
 import { cn } from "@/lib/utils";
 import { FloatingBlossoms } from "@/components/landing/florals";
 import {
@@ -50,7 +50,11 @@ import {
   pillTones,
 } from "@/components/course/course-surface";
 import { formatPriceWithFee } from "@/lib/constants";
-import type { Offering, Subject, Profile } from "@/lib/types/database";
+import type {
+  Offering,
+  Subject,
+  PublicProfile,
+} from "@/lib/types/database";
 
 export async function generateMetadata({
   params,
@@ -90,23 +94,31 @@ export default async function OfferingDetailPage({
 
   if (!offering) notFound();
 
-  let subjects: (Subject & { instructor: Profile })[] = [];
+  // This page is public, so both reads below run as `anon`. They must ask
+  // for PROFILE_SELECT_PUBLIC and nothing more: a column `anon` was not
+  // granted makes PostgREST refuse the WHOLE request with 401, which is
+  // how `instructor:profiles(*)` had been quietly returning no subjects
+  // at all ever since migration 046 narrowed the grant.
+  let subjects: (Subject & { instructor: PublicProfile | null })[] = [];
   if (offering.type === "program") {
     const { data } = await supabase
       .from("subjects")
-      .select("*, instructor:profiles!subjects_instructor_id_fkey(*)")
+      .select(
+        `*, instructor:profiles!subjects_instructor_id_fkey(${PROFILE_SELECT_PUBLIC})`
+      )
       .eq("offering_id", offering.id)
       .order("sort_order", { ascending: true });
-    subjects = (data as (Subject & { instructor: Profile })[]) || [];
+    subjects =
+      (data as (Subject & { instructor: PublicProfile | null })[]) || [];
   }
 
-  let instructor: Profile | null = null;
+  let instructor: PublicProfile | null = null;
   if (offering.instructor_id) {
     const { data } = await supabase
       .from("profiles")
-      .select(PROFILE_SELECT)
+      .select(PROFILE_SELECT_PUBLIC)
       .eq("id", offering.instructor_id)
-      .single<Profile>();
+      .single<PublicProfile>();
     instructor = data;
   }
 
