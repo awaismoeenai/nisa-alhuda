@@ -47,6 +47,21 @@ CREATE INDEX IF NOT EXISTS assignment_submissions_student_idx ON public.assignme
 ALTER TABLE public.assignment_papers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assignment_submissions ENABLE ROW LEVEL SECURITY;
 
+-- Production had these tables and policies created by hand, outside the
+-- migration history, so a push that reached this file aborted on
+-- `policy "assignment_papers_select" ... already exists` (SQLSTATE 42710)
+-- and rolled the whole migration back -- which also silently skipped the four
+-- indexes above, leaving them absent in production. CREATE POLICY has no
+-- IF NOT EXISTS, so drop-then-create is the only idempotent form; 044 and 047
+-- already use this pattern. Dropping is safe: every policy is recreated
+-- verbatim below, in the same transaction.
+DROP POLICY IF EXISTS assignment_papers_select ON public.assignment_papers;
+DROP POLICY IF EXISTS assignment_papers_staff_write ON public.assignment_papers;
+DROP POLICY IF EXISTS assignment_submissions_select ON public.assignment_submissions;
+DROP POLICY IF EXISTS assignment_submissions_student_write ON public.assignment_submissions;
+DROP POLICY IF EXISTS assignment_submissions_student_update ON public.assignment_submissions;
+DROP POLICY IF EXISTS assignment_submissions_staff_all ON public.assignment_submissions;
+
 -- Assignment Papers policies
 CREATE POLICY assignment_papers_select ON public.assignment_papers FOR SELECT
   USING (

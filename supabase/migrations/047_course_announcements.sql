@@ -42,8 +42,30 @@ CREATE INDEX IF NOT EXISTS course_announcements_subject_idx
   ON public.course_announcements (subject_id)
   WHERE subject_id IS NOT NULL;
 
+-- ── Reconcile a pre-existing table ───────────────────────────────────────────
+-- This table was created by hand in production before it reached the migration
+-- history, with author_id NOT NULL. CREATE TABLE IF NOT EXISTS above is a no-op
+-- there, so the column definition never gets corrected -- and the
+-- ON DELETE SET NULL on author_id_fkey can never fire against a NOT NULL
+-- column, which is the exact failure this column is nullable to avoid.
+-- DROP NOT NULL is idempotent, so this is a no-op on a freshly created table.
+ALTER TABLE public.course_announcements ALTER COLUMN author_id DROP NOT NULL;
+
 -- ── Row Level Security ────────────────────────────────────────────────────────
 ALTER TABLE public.course_announcements ENABLE ROW LEVEL SECURITY;
+
+-- Production received an earlier revision of this file by hand, so four of the
+-- six policies below already exist there (and the two TA policies do not).
+-- CREATE POLICY has no IF NOT EXISTS: without these drops the push aborts with
+-- SQLSTATE 42710 and rolls back, taking the TA policies and the storage grants
+-- with it. Drop-then-create also guarantees the stale definitions are replaced
+-- by the ones below rather than silently kept.
+DROP POLICY IF EXISTS course_announcements_select    ON public.course_announcements;
+DROP POLICY IF EXISTS course_announcements_insert    ON public.course_announcements;
+DROP POLICY IF EXISTS course_announcements_update    ON public.course_announcements;
+DROP POLICY IF EXISTS course_announcements_delete    ON public.course_announcements;
+DROP POLICY IF EXISTS course_announcements_ta_insert ON public.course_announcements;
+DROP POLICY IF EXISTS course_announcements_ta_update ON public.course_announcements;
 
 CREATE POLICY course_announcements_select ON public.course_announcements FOR SELECT
   USING (
