@@ -318,3 +318,66 @@ export async function setUserLockOverride(
   return { success: true };
 }
 
+
+export interface SetUserSuspendedResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Suspend or unsuspend a sister. Admin only.
+ *
+ * This used to be written straight from the browser with the signed-in
+ * user's own session. That worked because the "Staff can update any
+ * profile" RLS policy is row-scoped, which also meant any signed-in user
+ * could clear her OWN `is_suspended` flag (card #63). Migration 049 takes
+ * `is_suspended` out of the UPDATE grant for `authenticated`, so the write
+ * belongs here: role checked on the server, service-role client, audited.
+ */
+export async function setUserSuspended(
+  targetUserId: string,
+  suspended: boolean
+): Promise<SetUserSuspendedResult> {
+  const auth = await requireRole(["admin"]);
+  if (!auth.ok) return { success: false, error: auth.error };
+
+  if (!targetUserId) return { success: false, error: "Missing user id." };
+  if (typeof suspended !== "boolean") {
+    return { success: false, error: "Missing suspension state." };
+  }
+  if (targetUserId === auth.userId) {
+    return {
+      success: false,
+      error: "You cannot suspend yourself — ask another admin.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: target } = await admin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", targetUserId)
+    .single();
+  if (!target) return { success: false, error: "User not found." };
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ is_suspended: suspended })
+    .eq("id", targetUserId);
+
+  if (error) {
+    console.error("[setUserSuspended] DB error:", error);
+    return { success: false, error: error.message };
+  }
+
+  await logAudit({
+    actorId: auth.userId,
+    action: "user.suspension_set",
+    entityType: "profile",
+    entityId: targetUserId,
+    summary: `${suspended ? "Suspended" : "Unsuspended"} ${target.full_name || "a sister"}`,
+    metadata: { suspended },
+  });
+
+  return { success: true };
+}

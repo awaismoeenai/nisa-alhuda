@@ -68,6 +68,8 @@ function actionLabel(action: string): string {
     "user.roles_updated": "Roles changed",
     "user.password_reset_sent": "Reset link sent",
     "user.password_set": "Password set",
+    "user.suspension_set": "Suspension changed",
+    "user.lock_override_set": "Portal lock changed",
     "enrollment.approved": "Enrollment approved",
     "enrollment.rejected": "Enrollment rejected",
     "enrollment.manual_created": "Manual enrollment",
