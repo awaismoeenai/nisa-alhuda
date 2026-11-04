@@ -7,25 +7,27 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Profile, UserRole } from "@/lib/types/database";
+import { PROFILE_SELECT, PROFILE_SELECT_ADMIN } from "./profile-columns";
 
 /**
- * Fields any signed-in (or anonymous) caller may read — avoids select("*")
- * scatter, and matches the column GRANT in migration 046 exactly.
+ * The three column lists live in `./profile-columns`, which imports
+ * nothing, so a test can read them without booting a Supabase client.
+ * They are re-exported here because this is where the rest of the code
+ * already imports them from.
  *
- * `select("*")` on profiles no longer works from a user-scoped client: the
- * lock_override columns are revoked from anon/authenticated, and `*` expands
- * to every column including those. Always use one of these two constants.
+ * `select("*")` on profiles does not work from a user-scoped client: the
+ * lock_override columns are revoked from anon/authenticated, and `*`
+ * expands to every column including those. Always use one of these.
+ *
+ * `PROFILE_SELECT` is the SIGNED-IN list, and migration 050 means a
+ * visitor may not read it. Anything an anonymous caller can reach must
+ * use `PROFILE_SELECT_PUBLIC`.
  */
-export const PROFILE_SELECT =
-  "id, full_name, avatar_url, role, roles, phone, is_suspended, must_change_password, created_at, updated_at";
-
-/**
- * The above plus the admin lock-override columns. ONLY valid on a
- * service-role (admin) client — a user-scoped query with these columns is
- * rejected by the column grant.
- */
-export const PROFILE_SELECT_ADMIN =
-  "id, full_name, avatar_url, role, roles, phone, is_suspended, must_change_password, created_at, updated_at, lock_override, lock_override_note, lock_override_at, lock_override_by";
+export {
+  PROFILE_SELECT,
+  PROFILE_SELECT_ADMIN,
+  PROFILE_SELECT_PUBLIC,
+} from "./profile-columns";
 
 /** Fetch the caller's own profile. Returns null if not authenticated or not found. */
 export async function getOwnProfile(): Promise<Profile | null> {
