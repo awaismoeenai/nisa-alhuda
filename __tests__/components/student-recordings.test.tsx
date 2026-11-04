@@ -19,11 +19,12 @@
  * The local dev database has zero recordings, so these assertions — not the
  * `recordings-snapshot` baseline — are what prove the affordances still work.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SubjectAccordion } from "@/app/dashboard/student/offerings/[id]/subject-accordion";
 import type { Lesson, Subject } from "@/lib/types/database";
+import { isClassDayPkt } from "@/lib/recurring-schedule";
 
 /**
  * Plyr boots from a dynamic import inside an effect and expects a real media
@@ -233,7 +234,50 @@ describe("SubjectAccordion — recording watch paths", () => {
   });
 });
 
+/**
+ * This product runs on Pakistan Standard Time, because the students are in
+ * Pakistan. `isClassDayPkt` therefore shifts the instant by +5h and only then
+ * reads `getUTCDay()`, and so does every other day-of-week in the app. The
+ * fixture below used to build its day from the *true* UTC day instead, which
+ * disagrees with the Pakistan day every evening from 19:00 UTC once the
+ * Pakistan date has already rolled over — so the suite went red for five
+ * hours a night with no code change involved (#71).
+ *
+ * Two things keep it honest now. The clock is frozen, so the result no longer
+ * depends on what time of day the suite is run. And the day is read back
+ * through the very helper the component reads it through, rather than
+ * recomputed here — a second copy of the +5 offset living in the test would
+ * be free to drift away from the one in `src/lib/recurring-schedule.ts`.
+ */
+// 21:30 UTC sits deliberately inside the window that used to fail: in
+// Pakistan it is already 02:30 on the following day, a different weekday.
+const FROZEN_NOW = new Date("2026-03-10T21:30:00.000Z");
+
+/** The day-of-week the component will see, asked of the component's own helper. */
+function pktDayOfWeek(now: Date): number {
+  for (let day = 0; day < 7; day += 1) {
+    if (isClassDayPkt({ ...SUBJECT, recurring_day_of_week: day }, now)) {
+      return day;
+    }
+  }
+  // An empty match is a broken check, never a clean result: if no day matches,
+  // the Pakistan convention has changed shape and this test must say so.
+  throw new Error(
+    "isClassDayPkt matched no day of the week — the Pakistan day convention changed shape"
+  );
+}
+
 describe("SubjectAccordion — subject-level actions", () => {
+  beforeEach(() => {
+    // Only `Date` is faked; React Testing Library still needs real timers.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FROZEN_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders the recurring live class Join and the quiz launcher", () => {
     render(
       <SubjectAccordion
@@ -243,7 +287,7 @@ describe("SubjectAccordion — subject-level actions", () => {
             // A window wide enough that the class is always "live now",
             // so the day-gated Join is deterministic in CI.
             recurring_meeting_url: LIVE_URL,
-            recurring_day_of_week: new Date().getUTCDay(),
+            recurring_day_of_week: pktDayOfWeek(new Date()),
             recurring_start_time: "00:00:00",
             recurring_duration_minutes: 24 * 60,
             quiz_url: "https://forms.gle/abc123",
