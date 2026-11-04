@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Every developer keeps a git worktree of another branch under
+    // `.worktrees/`. Without this, a run started from the repository root
+    // leaves the branch under test and reports teammates' errors as ours.
+    // Covered at runtime by __tests__/lib/eslint-ignores.test.ts.
+    ".worktrees/**",
   ]),
 ]);
 
