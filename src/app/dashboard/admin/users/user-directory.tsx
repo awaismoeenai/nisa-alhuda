@@ -143,7 +143,7 @@ export function UserDirectory({
     setSuspendingId(profile.id);
     try {
       // Server action, not the browser client: `is_suspended` is no longer
-      // writable by a signed-in session (migration 049, card #63).
+      // writable by a signed-in session (migration 051, card #63).
       const res = await setUserSuspended(profile.id, !profile.is_suspended);
       if (!res.success) throw new Error(res.error);
       toast.success(

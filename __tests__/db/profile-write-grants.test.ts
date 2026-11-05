@@ -17,7 +17,7 @@
  *   * The file does not skip itself when the database is missing. See
  *     __tests__/helpers/local-stack.ts.
  *
- * Backed out migration 049 and watched these go red by name before
+ * Backed out migration 051 and watched these go red by name before
  * trusting them.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

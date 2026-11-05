@@ -330,7 +330,7 @@ export interface SetUserSuspendedResult {
  * This used to be written straight from the browser with the signed-in
  * user's own session. That worked because the "Staff can update any
  * profile" RLS policy is row-scoped, which also meant any signed-in user
- * could clear her OWN `is_suspended` flag (card #63). Migration 049 takes
+ * could clear her OWN `is_suspended` flag (card #63). Migration 051 takes
  * `is_suspended` out of the UPDATE grant for `authenticated`, so the write
  * belongs here: role checked on the server, service-role client, audited.
  */

@@ -1,7 +1,7 @@
 /**
  * Card #63 — the screens that write to `profiles`, walked in a browser.
  *
- * Migration 049 takes `role`, `roles`, `is_suspended`,
+ * Migration 051 takes `role`, `roles`, `is_suspended`,
  * `must_change_password` and `lock_override` out of the UPDATE grant for
  * a signed-in session. Two screens used to write through that grant, so
  * both were rewired to server actions. The database tests

@@ -34,7 +34,7 @@ export function PasswordForm() {
     try {
       // One server action sets the password AND clears the
       // must_change_password gate. The gate is no longer something the
-      // browser can clear on its own (card #63, migration 049).
+      // browser can clear on its own (card #63, migration 051).
       const res = await changeOwnPassword(newPassword);
       if (!res.success) throw new Error(res.error);
 

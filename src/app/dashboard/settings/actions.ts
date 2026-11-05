@@ -18,7 +18,7 @@ export interface ChangeOwnPasswordResult {
  * clear the flag on its own. Card #63 showed why that is wrong — clearing
  * the flag was a write a sister could make at any time, with or without a
  * new password, because the UPDATE policy on `profiles` is row-scoped and
- * the UPDATE grant covered every column. Migration 049 takes
+ * the UPDATE grant covered every column. Migration 051 takes
  * `must_change_password` out of that grant, so the flag now moves only
  * here, and only after the password has actually changed.
  *

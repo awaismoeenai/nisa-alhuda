@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 049: a sister may edit her own details, not her own powers
+-- Migration 051: a sister may edit her own details, not her own powers
 -- ============================================================
 -- Card #63. Proved by running it against a local copy of this database
 -- (all migrations applied, publishable key only, her own session):
