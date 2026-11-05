@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { clearMustChangePassword } from "./actions";
+import { changeOwnPassword } from "./actions";
+import { MIN_PASSWORD_LENGTH, validateNewPassword } from "@/lib/password-rules";
 
 export function PasswordForm() {
   const [newPassword, setNewPassword] = useState("");
@@ -19,8 +19,9 @@ export function PasswordForm() {
   const [saving, setSaving] = useState(false);
 
   async function handleChangePassword() {
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+    const invalid = validateNewPassword(newPassword);
+    if (invalid) {
+      toast.error(invalid);
       return;
     }
 
@@ -31,15 +32,11 @@ export function PasswordForm() {
 
     setSaving(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (error) throw new Error(error.message);
-
-      // Clear the must_change_password gate so the redirect loop ends.
-      await clearMustChangePassword();
+      // One server action sets the password AND clears the
+      // must_change_password gate. The gate is no longer something the
+      // browser can clear on its own (card #63, migration 051).
+      const res = await changeOwnPassword(newPassword);
+      if (!res.success) throw new Error(res.error);
 
       toast.success("Password updated successfully!");
       setNewPassword("");
@@ -54,7 +51,8 @@ export function PasswordForm() {
   }
 
   const canSubmit =
-    newPassword.length >= 6 && newPassword === confirmPassword;
+    newPassword.length >= MIN_PASSWORD_LENGTH &&
+    newPassword === confirmPassword;
 
   return (
     <Card>
@@ -65,7 +63,7 @@ export function PasswordForm() {
           <PasswordInput
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Minimum 6 characters"
+            placeholder={`Minimum ${MIN_PASSWORD_LENGTH} characters`}
           />
         </div>
 

@@ -39,10 +39,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { Profile, UserRole } from "@/lib/types/database";
-import { updateUserRoles, resetUserPassword, setUserPassword, setUserLockOverride } from "./actions";
+import {
+  updateUserRoles,
+  resetUserPassword,
+  setUserPassword,
+  setUserLockOverride,
+  setUserSuspended,
+} from "./actions";
 
 interface UserDirectoryProps {
   profiles: Profile[];
@@ -137,13 +142,10 @@ export function UserDirectory({
 
     setSuspendingId(profile.id);
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_suspended: !profile.is_suspended })
-        .eq("id", profile.id);
-
-      if (error) throw error;
+      // Server action, not the browser client: `is_suspended` is no longer
+      // writable by a signed-in session (migration 051, card #63).
+      const res = await setUserSuspended(profile.id, !profile.is_suspended);
+      if (!res.success) throw new Error(res.error);
       toast.success(
         profile.is_suspended
           ? `${profile.full_name} has been unsuspended.`
