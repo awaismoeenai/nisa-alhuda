@@ -55,3 +55,6 @@ docs/node_modules/
 # playwright
 /playwright-report/
 /test-results/
+
+# git worktrees of other branches (see eslint.config.mjs)
+/.worktrees/
